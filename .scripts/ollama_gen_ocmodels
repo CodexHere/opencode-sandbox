@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+#
+# Generates "models" object in the format expected by some OpenCode / local LLM configs
+# Output can be directly pasted/replaced inside your config file
+
+echo '"models": {'
+
+ollama ls | grep "\-ctx" | while IFS= read -r line; do
+    # Skip empty lines and obvious header remnants
+    [[ -z "$line" || "$line" =~ ^[[:space:]]*NAME ]] && continue
+
+    # Extract model name (first column)
+    model=$(echo "$line" | awk '{print $1}')
+
+    # Skip if we didn't get anything useful
+    [[ -z "$model" ]] && continue
+
+    # Print JSON line
+    # We add comma at the end – will remove from last line later
+    printf '  "%s": {\n    "name": "%s"\n  },\n' "$model" "$model"
+
+done | sed '$ s/},$/}/'   # remove comma from the very last entry
+
+echo '}'

@@ -1,0 +1,11 @@
+{
+  "name": "OpenCode (Standalone)",
+  "dockerComposeFile": "./docker-compose.yml",
+  "service": "opencode",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": ["sst-dev.opencode"]
+    }
+  }
+}

@@ -1,0 +1,196 @@
+#!/usr/bin/env bash
+#
+# ollama_model_mgr
+#   Pulls / updates models listed in a text file (optional)
+#   Cleans variant models (-ctxNN_thdNN)
+#   Prunes unwanted models
+#
+# Usage:
+#   ollama_model_mgr [OPTIONS] [filename]
+#   ollama_model_mgr -p -f           # delete ALL models (no file needed)
+#   ollama_model_mgr -cp models.txt   # clean + prune protected by file
+
+set -euo pipefail
+
+SCRIPT_NAME=$0
+DO_CLEAN=false
+DO_PRUNE=false
+FORCE_DELETE_ALL=false
+INPUT_FILE=""
+
+usage() {
+    cat <<EOF
+Usage: $SCRIPT_NAME [OPTIONS] [filename]
+
+<filename> is *sometimes* optional. When provided, it must be a plain text file with your model list.
+
+OPTIONS:
+  -c      remove all tuned models matching *-ctx[0-9]+_thd[0-9]+$
+  -p      prune: keep only listed models + variants (requires filename unless -f)
+  -f      force delete ALL models (only with -p and no filename)
+  -h      show this help
+
+File format:
+  # Comment and empty lines are ignored
+  # Space/Tabular alignment is ignored
+  # Thread Count is OPTIONAL. Empty value is a no-change, 'auto' will use \`numCpus/2\`.
+  # If both Context and Thread values are empty, 64k and default are used respectively.
+  # Model Name                    # ContextSize     # [Optional] Thread Count
+  qwen2.5:7b-instruct-q5_K_M      65536             12
+  granite3.2:8b-instruct-q4_K_M   32768
+  qwen3:8b-q4_K_M                 64                auto
+  hf.co/...:Q6_K                  131072            8
+
+Examples:
+  $SCRIPT_NAME -c models.txt
+  $SCRIPT_NAME -cp my-models.txt
+  $SCRIPT_NAME -p -f               # DANGER: deletes every model
+  $SCRIPT_NAME models.txt          # just pull/update listed models
+
+EOF
+    exit 1
+}
+
+while getopts ":cpf h" opt; do
+    case "$opt" in
+        c) DO_CLEAN=true ;;
+        p) DO_PRUNE=true ;;
+        f) FORCE_DELETE_ALL=true ;;
+        h) usage ;;
+        ?) echo "Invalid option: -$OPTARG" >&2; usage ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+if [[ $# -gt 1 ]]; then
+    echo "Error: too many arguments. At most one filename allowed."
+    usage
+fi
+
+INPUT_FILE="${1:-}"   # empty if no file provided
+
+# ────────────────────────────────────────────────
+# Show usage when no arguments and no meaningful flags
+# ────────────────────────────────────────────────
+if [[ $# -eq 0 ]] && ! $DO_CLEAN && ! $DO_PRUNE && ! $FORCE_DELETE_ALL; then
+    usage
+fi
+
+# Force delete only allowed without file
+if $FORCE_DELETE_ALL && [[ -n "$INPUT_FILE" ]]; then
+    echo "Error: -f (force delete all) cannot be used with a filename"
+    usage
+fi
+
+# If prune without file, must have -f
+if $DO_PRUNE && [[ -z "$INPUT_FILE" ]] && ! $FORCE_DELETE_ALL; then
+    echo "Error: -p without filename requires -f to delete everything"
+    usage
+fi
+
+# ────────────────────────────────────────────────
+# Load models if file provided
+# ────────────────────────────────────────────────
+declare -a MODELS
+if [[ -n "$INPUT_FILE" ]]; then
+    if [[ ! -f "$INPUT_FILE" ]]; then
+        echo "Error: file not found: $INPUT_FILE"
+        exit 1
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"
+        line="${line#"${line%%[![:space:]]*}"}"
+        line="${line%"${line##*[![:space:]]}"}"
+        [[ -z "$line" ]] && continue
+
+        read -r model _ _ <<< "$line"
+        [[ -z "$model" ]] && continue
+        MODELS+=("$model")
+    done < "$INPUT_FILE"
+
+    if [[ ${#MODELS[@]} -eq 0 ]]; then
+        echo "Error: no valid models found in $INPUT_FILE"
+        exit 1
+    fi
+fi
+
+# Helper functions
+is_variant() {
+    [[ $1 =~ -ctx[0-9]+_thd[0-9]+$ ]]
+}
+
+get_base() {
+    local name="$1"
+    if is_variant "$name"; then
+        echo "${name%-ctx*_thd*}"
+    else
+        echo "$name"
+    fi
+}
+
+# Phase 1 – Clean (always available)
+if $DO_CLEAN; then
+    echo "==============================================="
+    echo "Cleaning variant models (-ctx*_thd*)..."
+    echo "  Waiting 3 seconds – press Ctrl+C to cancel..."
+    sleep 3
+
+    ollama list | awk 'NR>1 && $1 ~ /-ctx[0-9]+_thd.+$/ {print $1}' \
+        | while read -r model; do
+            echo "  removing: $model"
+            ollama rm "$model" || true
+        done
+    echo
+fi
+
+# Phase 2 – Pull (default when file is given, no flags required)
+if [[ -n "$INPUT_FILE" ]]; then
+    echo "==============================================="
+    echo "Updating ${#MODELS[@]} model(s) from $INPUT_FILE"
+
+    for model in "${MODELS[@]}"; do
+        echo
+        echo "-> $model"
+        ollama pull "$model" || echo "  (pull failed – continuing)"
+    done
+    echo
+fi
+
+# Phase 3 – Prune
+if $DO_PRUNE; then
+    echo "==============================================="
+    echo "Pruning unwanted models..."
+
+    if [[ -z "$INPUT_FILE" ]] && $FORCE_DELETE_ALL; then
+        echo "  -f used without file → DELETING ALL MODELS"
+        echo "  Waiting 3 seconds – press Ctrl+C to cancel..."
+        sleep 3
+
+        ollama list | awk 'NR>1 {print $1}' | while read -r name; do
+            echo "  removing: $name"
+            ollama rm "$name" || true
+        done
+    else
+        declare -A wanted
+        for m in "${MODELS[@]}"; do
+            wanted["$m"]=1
+        done
+
+        ollama list | awk 'NR>1 {print $1}' | while read -r name; do
+            base=$(get_base "$name")
+            if [ -z "${wanted[$base]+set}" ]; then
+                echo "  removing: $name"
+                ollama rm "$name" || true
+            fi
+        done
+    fi
+
+    echo
+    echo "Remaining models:"
+    ollama list | grep -v '^NAME' || echo "  (none)"
+    echo
+fi
+
+echo "==============================================="
+echo "Done!"

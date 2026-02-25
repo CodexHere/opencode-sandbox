@@ -1,0 +1,1 @@
+This is an empty setup configuration for getting started with OpenCode and Ollama local hosted models.

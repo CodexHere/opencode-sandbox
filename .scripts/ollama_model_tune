@@ -1,0 +1,216 @@
+#!/usr/bin/env bash
+#
+# ollama_model_tune
+#   Creates custom context/thread variants + optional template concatenation
+#
+# Usage: ollama_model_tune [-n] [-t <threads>] [-c <context>] [-h] [filename]
+
+set -euo pipefail
+
+SCRIPT_NAME=$0
+DRY_RUN=false
+THREAD_OVERRIDE=""
+CONTEXT_OVERRIDE=""
+INPUT_FILE=""
+
+usage() {
+    cat <<EOF
+Usage: $SCRIPT_NAME [-n] [-t <threads>] [-c <context>] [-h] [filename]
+
+OPTIONS:
+  -n            dry-run: show what would be created (no changes)
+  -c N          override context (only when no filename is given)
+  -t N | auto   override threads (only when no filename is given)
+  -h            show this help
+
+<filename> is optional.
+
+File format (space or tab separated, 1 to 4 columns):
+  # Model Name                    ContextSize     [ThreadCount]   [TemplateFiles (comma-separated)]
+
+  Examples:
+  qwen2.5:7b-instruct-q5_K_M      65536           12
+  granite3.2:8b-instruct-q4_K_M   32768
+  qwen3:8b-q4_K_M                 65536           auto            tpl-tools.template
+  hf.co/...:Q4_K_M                131072          8               tpl-tools.template,tpl-coder.template
+
+Behavior:
+  • Template files are appended in order after PARAMETER lines
+  • Missing or empty template column → no templates added
+  • Without filename: tunes all non-tuned models (64k + auto/default threads), no templates
+
+EOF
+    exit 1
+}
+
+while getopts ":nt:c:h" opt; do
+    case "$opt" in
+        n) DRY_RUN=true ;;
+        t) THREAD_OVERRIDE="$OPTARG" ;;
+        c) CONTEXT_OVERRIDE="$OPTARG" ;;
+        h) usage ;;
+        ?) echo "Invalid option: -$OPTARG" >&2; usage ;;
+    esac
+done
+shift $((OPTIND - 1))
+
+INPUT_FILE="${1:-}"
+
+declare -a MODELS
+declare -a CONTEXTS
+declare -a THREADS_LIST
+declare -a TEMPLATES_LIST
+
+if [[ -n "$INPUT_FILE" ]]; then
+    if [[ ! -f "$INPUT_FILE" ]]; then
+        echo "Error: file not found: $INPUT_FILE"
+        exit 1
+    fi
+
+    while IFS= read -r line || [[ -n "$line" ]]; do
+        line="${line%%#*}"                          # remove comments
+        line="${line#"${line%%[![:space:]]*}"}"     # trim leading whitespace
+        line="${line%"${line##*[![:space:]]}"}"     # trim trailing whitespace
+        [[ -z "$line" ]] && continue
+
+        # Split into up to 4 fields
+        read -r model ctx thd tpl <<< "$line"
+
+        [[ -z "$model" ]] && continue
+
+        # Context handling
+        if [[ -n "$ctx" && "$ctx" =~ ^[0-9]+$ ]]; then
+            if [[ "$ctx" -le 512 ]]; then
+                ctx=$(( ctx * 1024 ))
+            fi
+        else
+            ctx=65536
+        fi
+
+        # Threads handling
+        thd="${thd:-default}"
+
+        # Templates handling
+        tpl="${tpl:-}"   # empty if not present
+
+        MODELS+=("$model")
+        CONTEXTS+=("$ctx")
+        THREADS_LIST+=("$thd")
+        TEMPLATES_LIST+=("$tpl")
+    done < "$INPUT_FILE"
+
+    if [[ ${#MODELS[@]} -eq 0 ]]; then
+        echo "Error: no valid models found in $INPUT_FILE"
+        exit 1
+    fi
+else
+    # No file → tune all non-tuned models, no templates
+    ncpu=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 8)
+    auto_threads=$(( ncpu / 2 ))
+    [[ $auto_threads -lt 1 ]] && auto_threads=1
+
+    ctx_value=65536
+    if [[ -n "$CONTEXT_OVERRIDE" ]]; then
+        if [[ "$CONTEXT_OVERRIDE" =~ ^[0-9]+$ ]]; then
+            if [[ "$CONTEXT_OVERRIDE" -le 512 ]]; then
+                ctx_value=$(( CONTEXT_OVERRIDE * 1024 ))
+            else
+                ctx_value="$CONTEXT_OVERRIDE"
+            fi
+        else
+            echo "Error: -c requires a numeric value"
+            exit 1
+        fi
+    fi
+
+    echo "No filename given → tuning all non-tuned models to $ctx_value context"
+    [[ -n "$THREAD_OVERRIDE" ]] && echo "   Threads override: $THREAD_OVERRIDE"
+    [[ -z "$THREAD_OVERRIDE" ]] && echo "   Auto threads: $auto_threads (detected $ncpu CPUs / 2)"
+    echo
+
+    while read -r name _; do
+        if [[ ! $name =~ -ctx[0-9]+_thd[0-9]+$ ]]; then
+            MODELS+=("$name")
+            CONTEXTS+=("$ctx_value")
+            THREADS_LIST+=("${THREAD_OVERRIDE:-default}")
+            TEMPLATES_LIST+=("")   # no templates when auto-tuning all
+        fi
+    done < <(ollama list | awk 'NR>1 {print $1}')
+fi
+
+get_threads_value() {
+    local th="$1"
+    if [[ "$th" == "auto" ]]; then
+        ncpu=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 8)
+        echo $(( ncpu / 2 ))
+    elif [[ "$th" == "default" ]]; then
+        echo ""
+    else
+        echo "$th"
+    fi
+}
+
+echo "Processing ${#MODELS[@]} model(s)"
+echo "Dry-run: $( [[ $DRY_RUN == true ]] && echo yes || echo no )"
+echo
+
+for i in "${!MODELS[@]}"; do
+    model="${MODELS[i]}"
+    ctx="${CONTEXTS[i]}"
+    thd="${THREADS_LIST[i]}"
+    tpl_list="${TEMPLATES_LIST[i]}"
+
+    threads_val=$(get_threads_value "$thd")
+    ctx_k=$(( ctx / 1024 ))
+    thread_suffix="${threads_val:-Def}"
+    new_name="${model}-ctx${ctx_k}_thd${thread_suffix}"
+
+    echo "→ $model"
+    echo "   → $new_name"
+    echo "   num_ctx=$ctx, num_thread=${threads_val:-(model default)}"
+
+    if [[ -n "$tpl_list" ]]; then
+        echo "   Templates: $tpl_list"
+    fi
+
+    if $DRY_RUN; then
+        echo "   (dry-run: would create)"
+    else
+        > Modelfile.tmp
+
+        echo "FROM $model" >> Modelfile.tmp
+        echo "PARAMETER num_ctx $ctx" >> Modelfile.tmp
+        [[ -n "$threads_val" ]] && echo "PARAMETER num_thread $threads_val" >> Modelfile.tmp
+
+        # Append each requested template file in order
+        if [[ -n "$tpl_list" ]]; then
+            IFS=',' read -ra files <<< "$tpl_list"
+            for tpl_file in "${files[@]}"; do
+                tpl_file="${tpl_file#"${tpl_file%%[![:space:]]*}"}"   # trim whitespace
+                tpl_file="${tpl_file%"${tpl_file##*[![:space:]]}"}"
+                if [[ -f "$tpl_file" ]]; then
+                    echo "   Appending $tpl_file"
+                    cat "$tpl_file" >> Modelfile.tmp
+                else
+                    echo "   WARNING: template file not found → $tpl_file (skipped)"
+                fi
+            done
+        fi
+
+        ollama create "$new_name" -f Modelfile.tmp > /dev/null 2>&1 || {
+            echo "   (create failed)"
+        }
+        rm -f Modelfile.tmp
+    fi
+
+    echo
+done
+
+echo "==============================================="
+echo "Tuning complete."
+
+echo
+echo "Remaining models:"
+ollama list | grep -v '^NAME' || echo "  (none)"
+echo
+exit 0
