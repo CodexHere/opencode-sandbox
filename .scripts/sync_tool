@@ -1,0 +1,86 @@
+#!/bin/bash
+
+# Run this once on the dev server (sender), and once on the ai/llm server (receiver)
+
+SCRIPT_NAME=$0
+TARGET="/tmp/sync"
+
+usage() {
+    cat <<EOF
+Usage: $SCRIPT_NAME [-s <dest> | -r <container>] -p <path> [-t <target>]
+  -s    Sender mode, Destination (User@IP) to sync to
+  -r    Receiver mode, Docker Container Name to sync to
+  -p    Sender: Local path to watch
+        Receiver: Remote path to watch
+  -t    Sender: Remote path to sync to (default=/tmp/sync)
+        Receiver: Target path inside container 
+EOF
+    exit 1
+}
+
+# Ensure inotify-tools is installed
+if ! command -v inotifywait &> /dev/null; then
+    echo "Error: inotifywait not found. Please install inotify-tools."
+    exit 1
+fi
+
+while getopts "s:r:p:t:" opt; do
+    case $opt in
+        s) MODE="sender"; REMOTE_DEST="$OPTARG" ;;
+        r) MODE="receiver"; CONTAINER="$OPTARG" ;;
+        p) WATCH_PATH="$(realpath "${OPTARG%/}")" ;; 
+        t) TARGET="${OPTARG%/}" ;;
+        *) usage ;;
+    esac
+done
+
+if [[ -z "$MODE" ]] || [[ -z "$WATCH_PATH" ]]; then
+    usage
+fi
+
+sendFile() {
+    # Syncs local folder content to remote temp folder
+    rsync -avz --exclude=.git "$WATCH_PATH/" "$REMOTE_DEST:$TARGET/"
+}
+
+recieveFile() {
+    local FILENAME=$1
+    # Ignore hidden rsync temporary files (start with .)
+    if [[ "$FILENAME" == .* ]]; then
+        return
+    fi
+
+    echo "File updated: $FILENAME. Copying to container $CONTAINER..."
+    # Copy the specific file to the target path
+    docker cp "$WATCH_PATH/$FILENAME" "$CONTAINER":"$TARGET/$FILENAME"
+}
+
+# --- Sender Logic ---
+if [ "$MODE" == "sender" ]; then
+    if [ -z "$REMOTE_DEST" ]; then echo "Error: Destination required for Send Mode."; exit 1; fi
+    
+    echo "Starting Sender: Watching [$WATCH_PATH]..."
+    # Initial sync, then watch and resync
+    sendFile 
+    inotifywait -m -r -e close_write,moved_to,create --format '%w%f' "$WATCH_PATH" | while read -r FILE; do
+        echo "Change detected: $FILE. Syncing..."
+        sendFile
+    done
+
+# --- Receiver Logic ---
+elif [ "$MODE" == "receiver" ]; then
+    if [ -z "$CONTAINER" ] || [ -z "$TARGET" ]; then 
+        echo "Error: -c and -t required for receiver."; exit 1; 
+    fi
+    
+    # Ensure the watch directory and the container directory exist
+    mkdir -p "$WATCH_PATH"
+    echo "Ensuring directory $TARGET exists in container..."
+    docker exec "$CONTAINER" sh -c "[ -d \"$TARGET\" ]" || exit 1
+
+    echo "Starting Receiver: Watching [$WATCH_PATH]..."
+    
+    inotifywait -m -q -e close_write,moved_to --exclude '^\.' --format '%f' "$WATCH_PATH" | while read -r FILENAME; do
+        recieveFile "$FILENAME"
+    done
+fi

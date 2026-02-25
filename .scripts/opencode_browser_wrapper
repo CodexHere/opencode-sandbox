@@ -1,0 +1,9 @@
+#!/bin/sh
+
+# Wrapper for the official opencode-browser kickoff script.
+# This should be the referenced script in, and Chrome will
+# start from the extension:
+# ~/.config/google-chrome/NativeMessagingHosts/com.opencode.browser_automation.json
+# (or associative browser folder that you're running)
+
+docker exec -i opencode-agent "/root/.opencode-browser/host-wrapper.sh"

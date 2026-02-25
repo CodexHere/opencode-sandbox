@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+set -o pipefail
+
+# Start this in the opencode container:
+# docker exec -it opencode-agent opencode_start <args>
+
+#  Starts opencode
+#  - no arguments    →  runs: opencode
+#  - with --web      →  runs: opencode web --hostname 0.0.0.0 --port 4096
+#  - extra args are passed through when using --web
+
+# shellcheck disable=SC1091
+# We need to source the user's env to get started...
+. /root/.bashrc
+
+# Default command
+CMD=(opencode)
+MSG="Starting OpenCode"
+
+if [[ "${1:-}" == "--web" || "${1:-}" == "web" || "${1:-}" == "--http" ]]; then
+    shift
+    CMD=(opencode web --hostname 0.0.0.0 --port 4096 "$@")
+    MSG="$MSG Web UI"
+fi
+
+if ! speakturbo "$MSG" > /dev/null 2>&1; then
+  echo -e "\033[31m⚠ TTS failed to load...\033[0m"
+  echo -e "\033[32m⚠ You need to restart the container, or manually start 'speakturbo-daemon'\033[0m"
+fi
+
+# Run our opencode startup
+echo ""
+echo "command : ${CMD[*]}"
+echo -e "\n\n"
+"${CMD[@]}"

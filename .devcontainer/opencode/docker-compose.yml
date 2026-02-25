@@ -1,0 +1,48 @@
+# This runs opencode *only*, assuming ollama or another Provider is already standing up, possibly even remotely.
+
+services:
+  opencode:
+    build: .
+    image: opencode:local
+    container_name: opencode-agent
+    working_dir: /workspace
+    # Needed for webui
+    ports:
+      - 4096:4096
+    # env_file: .env
+    environment:
+      # Needed for ssh/git
+      - SSH_AUTH_SOCK=/run/ssh-agent
+      # Needed for desktop-agent
+      - DISPLAY=${DISPLAY}
+      # - important for PipeWire
+      - XDG_RUNTIME_DIR=/tmp/runtime-dir
+      - PIPEWIRE_RUNTIME_DIR=/tmp/runtime-dir
+      # - helps PulseAudio-compat apps
+      - PULSE_SERVER=unix:/tmp/runtime-dir/pulse/native
+
+    volumes:
+      - ../..:/workspace
+      # Needed for opencode stores
+      - ~/.agents:/root/.agents
+      - ~/.config/opencode:/root/.config/opencode
+      - ~/.opencode-browser:/root/.opencode-browser
+      - ~/.config/google-chrome/NativeMessagingHosts:/root/.config/google-chrome/NativeMessagingHosts/
+      - ~/.local/share/opencode:/root/.local/share/opencode
+      # Needed for avahi
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+      - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
+      # Needed for ssh/git
+      - ${SSH_AUTH_SOCK}:/run/ssh-agent
+      - ~/.gitconfig:/root/.gitconfig:ro
+      # Needed for dind
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Needed for desktop-agent
+      # - X11 stuff (also using Xwayland fallback)
+      - /tmp/.X11-unix:/tmp/.X11-unix:rw
+      - ${XDG_RUNTIME_DIR}/${WAYLAND_DISPLAY:-__no_wayland_socket__}:/tmp/${WAYLAND_DISPLAY:-__no_wayland_socket__}:ro      # - PipeWire socket (primary)
+      - ${XDG_RUNTIME_DIR}/pipewire-0:/tmp/runtime-dir/pipewire-0:ro
+      # - PipeWire's PulseAudio emulation socket (very helpful for compatibility)
+      - ${XDG_RUNTIME_DIR}/pulse/native:/tmp/runtime-dir/pulse/native:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

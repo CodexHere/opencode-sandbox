@@ -1,0 +1,31 @@
+{
+  "VsCodeTaskButtons.tasks": [
+    {
+      "label": "OpenCode Web UI",
+      "task": "start-webui",
+      "alignment": "right",
+      "color": "warning"
+    }
+  ],
+  "peacock.remoteColor": "#330000",
+  // Peacock Generated --
+  "workbench.colorCustomizations": {
+    "activityBar.activeBackground": "#660000",
+    "activityBar.background": "#660000",
+    "activityBar.foreground": "#e7e7e7",
+    "activityBar.inactiveForeground": "#e7e7e799",
+    "activityBarBadge.background": "#008000",
+    "activityBarBadge.foreground": "#e7e7e7",
+    "commandCenter.border": "#e7e7e799",
+    "sash.hoverBorder": "#660000",
+    "statusBar.background": "#330000",
+    "statusBar.foreground": "#e7e7e7",
+    "statusBarItem.hoverBackground": "#660000",
+    "statusBarItem.remoteBackground": "#330000",
+    "statusBarItem.remoteForeground": "#e7e7e7",
+    "titleBar.activeBackground": "#330000",
+    "titleBar.activeForeground": "#e7e7e7",
+    "titleBar.inactiveBackground": "#33000099",
+    "titleBar.inactiveForeground": "#e7e7e799"
+  }
+}

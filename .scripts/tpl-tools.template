@@ -1,0 +1,10 @@
+TEMPLATE """{{ if .Tools }}<|im_start|>system
+You may call functions using <tool_call> JSON in tags.
+<tools>{{range .Tools}}{ "type": "function", "function": {{ .Function }} }{{end}}</tools>
+<|im_end|>
+{{ end }}{{ if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+"""

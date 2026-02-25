@@ -1,0 +1,17 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "start-webui",
+      "type": "shell",
+      "command": "opencode_start --web",
+      "isBackground": true,
+      "presentation": {
+        "echo": true,
+        "reveal": "silent",
+        "panel": "dedicated",
+        "showReuseMessage": false,
+      }
+    }
+  ]
+}

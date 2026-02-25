@@ -1,0 +1,18 @@
+{
+  "name": "OpenCode + Ollama + Open WebUI",
+  "dockerComposeFile": [
+    "../opencode/docker-compose.yml",
+    "./docker-compose.yml"
+  ],
+  "service": "opencode",
+  "workspaceFolder": "/workspace",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "sst-dev.opencode",
+        "johnpapa.vscode-peacock",
+        "spencerwmiles.vscode-task-buttons"
+      ]
+    }
+  }
+}
