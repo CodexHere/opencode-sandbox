@@ -1,0 +1,17 @@
+{
+  "name": "OpenCode Workspace",
+  "dockerComposeFile": "./docker-compose.yml",
+  "service": "opencode",
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    "source=${localEnv:HOME}/.local/share/opencode,target=/root/.local/share/opencode,type=bind",
+    "source=${localEnv:HOME}/.config/opencode,target=/root/.config/opencode,type=bind"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "sst-dev.opencode" 
+      ]
+    }
+  }
+}

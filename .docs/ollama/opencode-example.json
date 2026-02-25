@@ -1,0 +1,38 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://ollama.local:11434/v1"
+      },
+      "models": {
+        "qwen3-coder-next:q4_K_M-64k": {
+          "name": "qwen3-coder-next:q4_K_M-64k"
+        },
+        "qwen2.5-coder:14b-instruct-64k": {
+          "name": "qwen2.5-coder:14b-instruct-64k"
+        },
+        "qwen2.5-coder:3b-instruct-64k": {
+          "name": "qwen2.5-coder:3b-instruct-64k"
+        },
+        "qwen2.5:14b-instruct-64k": {
+          "name": "qwen2.5:14b-instruct-64k"
+        },
+        "qwen2.5:7b-instruct-64k": {
+          "name": "qwen2.5:7b-instruct-64k"
+        },
+        "deepseek-r1:14b-64k": {
+          "name": "deepseek-r1:14b-64k"
+        },
+        "deepseek-r1:8b-64k": {
+          "name": "deepseek-r1:8b-64k"
+        },
+        "deepseek-coder-v2:16b-64k": {
+          "name": "deepseek-coder-v2:16b-64k"
+        }
+      }
+    }
+  }
+}

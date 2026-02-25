@@ -1,0 +1,61 @@
+# This runs ollama and open-webui *in addition* to opencode, to provide a completely seamless experience out of box.
+# Feel free to disable open-webui if you don't need it!
+
+services:
+  opencode:
+    build: .
+    image: opencode:local
+    container_name: opencode-agent
+    working_dir: /workspace
+    volumes:
+      - ..:/workspace
+      # Needed for opencode stores
+      - ~/.config/opencode:/root/.config/opencode
+      - ~/.local/share/opencode:/root/.local/share/opencode
+      # Needed for avahi
+      - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
+      - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
+    stdin_open: true
+    tty: true
+    # env_file: .env
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    tty: true
+    # Needed for nvidia gpu container support
+    runtime: nvidia
+    gpus: all
+    ports:
+      # direct api access
+      - 11434:11434
+    environment:
+      - OLLAMA_ORIGINS="*"
+      - OLLAMA_DEBUG=0
+    volumes:
+      - ollama-data:/root/.ollama/
+
+  # Feel free to disable ollama-web if you don't need it!
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    environment:
+      - "OLLAMA_BASE_URL=http://ollama:11434"
+      # CAUTION: completely disables AUTH and is available to anyone with access. NOT PRODUCTION SAFE!
+      - WEBUI_AUTH=false
+    ports:
+      - 3000:8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ollama-web:/app/backend/data
+
+volumes:
+  ollama-web: {}
+  ollama-data: {}
