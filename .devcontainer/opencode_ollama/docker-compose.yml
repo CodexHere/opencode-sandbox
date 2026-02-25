@@ -1,0 +1,44 @@
+services:
+  # These are overlaid from the base `docker-compose.yml`
+  opencode:
+    build: ../opencode/
+    depends_on:
+      - ollama
+      - open-webui
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: unless-stopped
+    tty: true
+    # Needed for nvidia container support
+    runtime: nvidia
+    gpus: all
+    ports:
+      - 11434:11434
+    environment:
+      - OLLAMA_ORIGINS="*"
+      - OLLAMA_DEBUG=1
+    volumes:
+      - ollama-data:/root/.ollama/
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    environment:
+      - "OLLAMA_BASE_URL=http://ollama:11434"
+      # Caution, this completely removes user auth and if exposed to the internet anyone can access the webui, and ultimately the LLM.
+      - WEBUI_AUTH=false
+    ports:
+      - 3000:8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ollama-web:/app/backend/data
+
+volumes:
+  ollama-web: {}
+  ollama-data: {}

@@ -1,0 +1,16 @@
+{
+  "name": "OpenCode (Standalone)",
+  "dockerComposeFile": "./docker-compose.yml",
+  "service": "opencode",
+  "workspaceFolder": "/workspace",
+  "mounts": [
+    "source=${localEnv:HOME}/.agents,target=/root/.agents,type=bind",
+    "source=${localEnv:HOME}/.config/opencode,target=/root/.config/opencode,type=bind",
+    "source=${localEnv:HOME}/.local/share/opencode,target=/root/.local/share/opencode,type=bind"
+  ],
+  "customizations": {
+    "vscode": {
+      "extensions": ["sst-dev.opencode"]
+    }
+  }
+}

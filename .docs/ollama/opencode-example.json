@@ -1,36 +1,56 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "provider": {
-    "ollama": {
+    "ollama-docker": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (docker)",
+      "options": {
+        "baseURL": "http://ollama:11434/v1"
+      },
+      "models": {
+        "hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q6_K-64k": {
+          "name": "hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q6_K-64k"
+        },
+        "hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q4_K_M-64k": {
+          "name": "hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q4_K_M-64k"
+        },
+        "granite3.2:8b-instruct-q4_K_M-64k": {
+          "name": "granite3.2:8b-instruct-q4_K_M-64k"
+        },
+        "qwen2.5-coder:3b-instruct-q6_K-64k": {
+          "name": "qwen2.5-coder:3b-instruct-q6_K-64k"
+        },
+        "qwen2.5-coder:14b-instruct-q4_K_M-64k": {
+          "name": "qwen2.5-coder:14b-instruct-q4_K_M-64k"
+        },
+        "qwen2.5:7b-instruct-q5_K_M-64k": {
+          "name": "qwen2.5:7b-instruct-q5_K_M-64k"
+        },
+        "qwen2.5:14b-instruct-q4_K_M-64k": {
+          "name": "qwen2.5:14b-instruct-q4_K_M-64k"
+        },
+        "qwen3:4b-instruct-2507-q4_K_M-64k": {
+          "name": "qwen3:4b-instruct-2507-q4_K_M-64k"
+        },
+        "qwen3:8b-q4_K_M-64k": {
+          "name": "qwen3:8b-q4_K_M-64k"
+        },
+        "qwen3:14b-q4_K_M-64k": {
+          "name": "qwen3:14b-q4_K_M-64k"
+        }
+      }
+    },
+
+    "ollama-local": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Ollama (local)",
       "options": {
-        "baseURL": "http://ollama.local:11434/v1"
+        "baseURL": "http://localhost:11434/v1"
       },
+
       "models": {
-        "qwen3-coder-next:q4_K_M-64k": {
-          "name": "qwen3-coder-next:q4_K_M-64k"
-        },
-        "qwen2.5-coder:14b-instruct-64k": {
-          "name": "qwen2.5-coder:14b-instruct-64k"
-        },
-        "qwen2.5-coder:3b-instruct-64k": {
-          "name": "qwen2.5-coder:3b-instruct-64k"
-        },
-        "qwen2.5:14b-instruct-64k": {
-          "name": "qwen2.5:14b-instruct-64k"
-        },
-        "qwen2.5:7b-instruct-64k": {
-          "name": "qwen2.5:7b-instruct-64k"
-        },
-        "deepseek-r1:14b-64k": {
-          "name": "deepseek-r1:14b-64k"
-        },
-        "deepseek-r1:8b-64k": {
-          "name": "deepseek-r1:8b-64k"
-        },
-        "deepseek-coder-v2:16b-64k": {
-          "name": "deepseek-coder-v2:16b-64k"
+        "populate as needed": {
+          "name": "populate as needed"
         }
       }
     }

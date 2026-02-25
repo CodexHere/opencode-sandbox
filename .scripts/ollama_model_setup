@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+#
+# Pulls a list of models, creates 64k-context variants, and optionally cleans/prunes.
+
+set -euo pipefail
+
+models=(
+  "hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q6_K"
+  "hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q4_K_M"
+  "granite3.2:8b-instruct-q4_K_M"
+  "qwen2.5-coder:3b-instruct-q6_K"
+  "qwen2.5-coder:14b-instruct-q4_K_M"
+  "qwen2.5:7b-instruct-q5_K_M"
+  "qwen2.5:14b-instruct-q4_K_M"
+  "qwen3:4b-instruct-2507-q4_K_M"
+  "qwen3:8b-q4_K_M"
+  "qwen3:14b-q4_K_M"
+)
+
+CLEAN_64K=false
+PRUNE_OTHERS=false
+
+usage() {
+  cat <<'EOF'
+Usage: ollama_model_setup [OPTIONS]
+
+Pulls selected models via ollama pull, creates 64k context variants (-64k suffix),
+and optionally removes old 64k models or unrelated models.
+
+Options:
+  -c          Clean/remove all existing models whose name contains "64k"
+  -p          Prune: remove all models that are neither in the hardcoded list
+              nor end with -64k
+  -h          Show this help message and exit
+
+Examples:
+  ollama_model_setup                  # just pull + create 64k variants
+  ollama_model_setup -c               # clean old 64k models first
+  ollama_model_setup -p               # prune unrelated models at the end
+  ollama_model_setup -cp              # clean first, then pull/create, then prune
+
+EOF
+  exit 0
+}
+
+while getopts ":cph" opt; do
+  case $opt in
+    c) CLEAN_64K=true ;;
+    p) PRUNE_OTHERS=true ;;
+    h) usage ;;
+    \?) echo "Invalid option: -$OPTARG" >&2; echo "Use -h for help" >&2; exit 1 ;;
+  esac
+done
+shift $((OPTIND-1))
+
+if $CLEAN_64K; then
+  echo "Cleaning all models containing '64k'..."
+  ollama list | awk '/64k/ {print $1}' | xargs -r ollama rm
+  echo
+fi
+
+for model in "${models[@]}"; do
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  echo "Pulling $model..."
+  ollama pull "$model"
+
+  new_name="${model}-64k"
+  echo "Creating $new_name (num_ctx = 65536)"
+
+  cat > Modelfile.tmp <<EOF
+FROM $model
+PARAMETER num_ctx 65536
+EOF
+
+  ollama create "$new_name" -f Modelfile.tmp
+  rm -f Modelfile.tmp
+  echo
+done
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "All requested models processed."
+
+if $PRUNE_OTHERS; then
+  echo "Pruning models not in target list or ending with -64k..."
+  echo
+
+  ollama list | awk 'NR>1 {print $1}' | while read -r name; do
+    base_name="${name%-64k}"
+    keep=false
+
+    for target in "${models[@]}"; do
+      if [[ "$name" == "$target" || "$name" == "${target}-64k" ]]; then
+        keep=true
+        break
+      fi
+    done
+
+    if ! $keep; then
+      echo "Removing: $name"
+      ollama rm "$name"
+    fi
+  done
+
+  echo
+  echo "Prune complete. Remaining models:"
+  ollama list
+fi
+
+echo
+echo "Done."
+exit 0

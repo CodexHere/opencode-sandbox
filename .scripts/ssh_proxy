@@ -1,0 +1,58 @@
+#!/usr/bin/env sh
+#
+# Sets up an SSH Agent Proxy for a specific key to be used within a container.
+# THIS SHOULD BE RAN ON THE HOST!
+
+DEFAULT_KEY="${HOME}/.ssh/id_rsa"
+
+usage() {
+    cat <<'EOF'
+Usage: ssh_proxy [-h] [KEY_PATH]
+
+Ensures ssh-agent is running and loads the specified SSH key (or default).
+
+Options:
+  -h          Show this help and exit
+
+If KEY_PATH is provided, it is used instead of the default: ${DEFAULT_KEY}
+
+Examples:
+  ssh_proxy
+  ssh_proxy ~/.ssh/id_ed25519
+  ssh_proxy -h
+EOF
+    exit 0
+}
+
+KEY="${DEFAULT_KEY}"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -h) usage ;;
+        -*)
+            echo "Error: Unknown option $1" >&2
+            echo "Use -h for help" >&2
+            exit 1
+            ;;
+        *)
+            KEY="$1"
+            shift
+            ;;
+    esac
+done
+
+[ -f "$KEY" ] || { echo "Error: Key not found: $KEY" >&2; exit 1; }
+[ -r "$KEY" ] || { echo "Error: Key not readable: $KEY" >&2; exit 1; }
+
+if [ -n "$SSH_AUTH_SOCK" ] && [ -S "$SSH_AUTH_SOCK" ] && ssh-add -l >/dev/null 2>&1; then
+    exit 0
+fi
+
+SSH_AGENT_PROXY="${HOME}/ssh-agent-proxy"
+
+if [ -z "$SSH_AUTH_SOCK" ] || [ ! -S "$SSH_AUTH_SOCK" ]; then
+    ssh-agent -s > "${SSH_AGENT_PROXY}" || { echo "Error: ssh-agent failed" >&2; exit 1; }
+    . "${SSH_AGENT_PROXY}" >/dev/null 2>&1 || { echo "Error: Failed to load agent env" >&2; exit 1; }
+fi
+
+ssh-add "$KEY" >/dev/null 2>&1 || { echo "Error: Failed to add key $KEY" >&2; exit 1; }

@@ -6,16 +6,28 @@ services:
     image: opencode:local
     container_name: opencode-agent
     working_dir: /workspace
+    # Needed for webui
+    ports:
+      - 4096:4096
+    # env_file: .env
+    environment:
+      # Needed for ssh/git
+      - SSH_AUTH_SOCK=/run/ssh-agent
     volumes:
-      - ..:/workspace
+      - ../..:/workspace
       # Needed for opencode stores
+      - ~/.agents:/root/.agents
       - ~/.config/opencode:/root/.config/opencode
       - ~/.local/share/opencode:/root/.local/share/opencode
       # Needed for avahi
       - /run/dbus/system_bus_socket:/run/dbus/system_bus_socket
       - /var/run/avahi-daemon/socket:/var/run/avahi-daemon/socket
+      # Needed for ssh/git
+      - ${SSH_AUTH_SOCK}:/run/ssh-agent
+      - ~/.gitconfig:/root/.gitconfig:ro
+      # Needed for dind
+      - /var/run/docker.sock:/var/run/docker.sock
     stdin_open: true
     tty: true
-    # env_file: .env
     extra_hosts:
       - "host.docker.internal:host-gateway"
