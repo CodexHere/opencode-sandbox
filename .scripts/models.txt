@@ -1,0 +1,46 @@
+# These are some decent default models,
+# Feel free to modify the list and import/prune as you see fit!
+# Thread Count is OPTIONAL. Empty value is a no-change, 'auto' will use `numCpus/2`.
+
+# Model Name                                                # ContextSize       # [Optional] Thread Count   # [Optional] Template List (csv)
+qwen3.5:0.8b-q8_0                                           128                 8
+qwen3.5:0.8b-q8_0                                           256                 12
+qwen3.5:0.8b-bf16                                           128                 8
+qwen3.5:0.8b-bf16                                           256                 12
+qwen2.5-coder:3b-instruct-q6_K                              32                  8
+qwen2.5-coder:3b-instruct-q8_0                              32                  8
+qwen3:8b-q4_K_M                                             40                  8
+qwen3:8b-q8_0                                               40                  8
+qwen3:4b-instruct-2507-q4_K_M                               64                  8
+glm-4.7-flash:q4_K_M                                        64                  4
+glm-4.7-flash:q4_K_M                                        198                 12
+hf.co/bartowski/nvidia_Orchestrator-8B-GGUF:Q4_K_M          64                  8
+qwen3.5:4b-q8_0                                             64                  8
+qwen3.5:4b-q8_0                                             256                 12
+qwen3.5:4b-bf16                                             64                  8
+qwen3.5:4b-bf16                                             256                 12
+qwen3.5:9b-q4_K_M                                           64                  8
+qwen3.5:9b-q4_K_M                                           256                 12
+qwen3.5:9b-q8_0                                             64                  8
+qwen3.5:9b-q8_0                                             256                 12
+
+# New Models
+#hf.co/unsloth/Qwen3-Coder-Next-GGUF:Q4_K_M                  32                  8                           tpl-tools.template
+#hf.co/unsloth/Qwen3-Next-80B-A3B-Instruct-GGUF:Q4_K_M       64                  8                           tpl-tools.template
+#hf.co/unsloth/Qwen3-Next-80B-A3B-Instruct-GGUF:Q4_K_M       128                 12                          tpl-tools.template
+#hf.co/unsloth/gpt-oss-20b-GGUF:Q4_K_M                       64                  8                           tpl-tools.template
+#hf.co/unsloth/gpt-oss-20b-GGUF:Q4_K_M                       128                 12                          tpl-tools.template
+#hf.co/unsloth/Qwen3.5-35B-A3B-GGUF:Q4_K_M                   64                  8                           tpl-tools.template
+#hf.co/unsloth/Qwen3.5-35B-A3B-GGUF:Q4_K_M                   256                 12                          tpl-tools.template
+#hf.co/bartowski/Qwen2.5-3B-Instruct-GGUF:Q8_0               32                  8                           tpl-tools.template
+#hf.co/unsloth/Qwen2.5-Coder-3B-Instruct-GGUF:Q8_0           32                  8                           tpl-tools.template
+#hf.co/bartowski/Qwen2.5-Coder-3B-GGUF:Q8_0                  32                  8                           tpl-tools.template
+#hf.co/bartowski/Qwen2.5-3B-GGUF:Q8_0                        32                  8                           tpl-tools.template
+#hf.co/unsloth/Qwen2.5-Coder-7B-Instruct-GGUF:Q5_K_M         32                  8                           tpl-tools.template
+#hf.co/unsloth/Qwen3.5-4B-GGUF:Q3_K_M                        64                  8                           tpl-tools.template
+#hf.co/unsloth/Qwen3.5-4B-GGUF:Q3_K_M                        256                 12                          tpl-tools.template
+#hf.co/bartowski/phi-3-mini-4k-instruct-GGUF:Q8_0            4                   8                           tpl-tools.template
+#hf.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF:Q2_K        128                 8                           tpl-tools.template
+#hf.co/unsloth/granite-3.3-8b-instruct-GGUF:Q2_K             128                 8                           tpl-tools.template
+#hf.co/unsloth/Qwen3.5-9B-GGUF:Q4_K_M                        64                  8                           tpl-tools.template
+#hf.co/unsloth/Qwen3.5-9B-GGUF:Q4_K_M                        256                 12                          tpl-tools.template

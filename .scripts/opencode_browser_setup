@@ -1,0 +1,78 @@
+#!/usr/bin/env bash
+
+# Start this on the docker host, once the container(s) are stood up!
+# This will call into expected containers to perform the work.
+
+set -euo pipefail
+
+: "${OPENCODE_NM_DIR:=$HOME/.config/google-chrome/NativeMessagingHosts}"
+: "${CONTAINER_NAME:=opencode-agent}"
+
+PROXY_SCRIPT_NAME="opencode_browser_wrapper"
+
+EXTENSION_DIR_HOST="$HOME/.opencode-browser"
+MANIFEST_NAME="com.opencode.browser_automation.json"
+MANIFEST_HOST="$OPENCODE_NM_DIR/$MANIFEST_NAME"
+
+SCRIPT_NAME="${BASH_SOURCE[0]}"
+SCRIPT_DIR=$(cd "$(dirname "${SCRIPT_NAME}")" &>/dev/null && pwd)
+PROXY_SCRIPT_HOST="$SCRIPT_DIR/$PROXY_SCRIPT_NAME"
+
+echo "Installing opencode-browser into container: $CONTAINER_NAME"
+docker exec -it $CONTAINER_NAME bunx @different-ai/opencode-browser@latest install
+
+if [ ! -d "$EXTENSION_DIR_HOST/extension" ] || [ ! -f "$EXTENSION_DIR_HOST/extension/manifest.json" ]; then
+  echo "Extension files missing in $EXTENSION_DIR_HOST/extension"
+  echo "Did the install finish or did the volume mount break? Re-run and try again."
+  exit 1
+fi
+
+if [ ! -d "$OPENCODE_NM_DIR" ]; then
+  echo "NativeMessagingHosts directory missing: $OPENCODE_NM_DIR"
+  echo "Chrome (or variant) profile not initialized, or wrong browser."
+  echo "Common locations:"
+  echo "  Chrome:       ~/.config/google-chrome/NativeMessagingHosts"
+  echo "  Chromium:     ~/.config/chromium/NativeMessagingHosts"
+  echo "  Brave:        ~/.config/BraveSoftware/Brave-Browser/NativeMessagingHosts"
+  echo "  Edge:         ~/.config/microsoft-edge/NativeMessagingHosts"
+  echo ""
+  echo "Verify the dir exists for your browser, then re-run and try again."
+  echo "Or override with env: export OPENCODE_NM_DIR=/correct/path && ${SCRIPT_NAME}"
+  exit 1
+fi
+
+if [ ! -x "$PROXY_SCRIPT_HOST" ]; then
+  echo "Proxy script missing/not executable: $PROXY_SCRIPT_HOST"
+  echo "Ensure '$PROXY_SCRIPT_NAME' exists beside this script and is chmod +x."
+  exit 1
+fi
+
+if [ ! -f "$MANIFEST_HOST" ]; then
+  echo "Manifest missing: $MANIFEST_HOST"
+  echo "Run install inside container to generate it (requires volume mount for $OPENCODE_NM_DIR):"
+  echo "  -v \"$OPENCODE_NM_DIR\":/root/.config/google-chrome/NativeMessagingHosts  (adjust subpath for Brave/Edge/etc.)"
+  echo ""
+  echo "Then re-run this script. If still missing, use OPENCODE_NM_DIR to point to the correct browser dir."
+  exit 1
+fi
+
+# Dynamically update only the path property
+ESCAPED_PROXY=$(printf '%s\n' "$PROXY_SCRIPT_HOST" | sed 's:[][\\/.*^$&]:\\&:g')
+sed -i -E "s|(\"path\": \").*?(\")|\1$ESCAPED_PROXY\2|" "$MANIFEST_HOST"
+echo "Manifest path updated to: $PROXY_SCRIPT_HOST"
+
+echo ""
+echo "Next:"
+echo "- Ensure container running"
+echo "- chrome://extensions/ → Developer mode"
+echo "- Load unpacked: $EXTENSION_DIR_HOST/extension (one-time only)"
+echo "- Reload extension → should show ON"
+echo ""
+echo ""
+read -n 1 -s -r -p "Press any key to check status..."
+
+docker exec $CONTAINER_NAME bunx @different-ai/opencode-browser@latest status
+
+echo ""
+echo "Tab Test:"
+docker exec -it $CONTAINER_NAME bunx @different-ai/opencode-browser@latest tool browser_get_tabs | tail -n +5 | jq '.[].title'

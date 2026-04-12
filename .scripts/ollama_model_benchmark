@@ -1,0 +1,91 @@
+#!/usr/bin/env bash
+
+# Start this in the ollama container:
+# docker exec -it ollama ollama_model_benchmark <args>
+
+set -euo pipefail
+
+N=${1:-5}
+PROMPT_FILE="bench_prompt.txt"
+OUTPUT_DIR="./benchmark"
+SUMMARY_FILE="${OUTPUT_DIR}/bench.txt"
+
+if [ ! -f "$PROMPT_FILE" ]; then
+    echo "ERROR: prompt file not found: $PROMPT_FILE" >&2
+    exit 1
+fi
+
+mkdir -p "$OUTPUT_DIR"
+: > "$SUMMARY_FILE"
+
+echo "STARTING OLLAMA MODEL BENCHMARK"
+echo "prompt file    : $PROMPT_FILE"
+echo "runs per model : $N"
+echo "output folder  : $OUTPUT_DIR"
+echo ""
+
+# ────────────────────────────────────────────────
+# Collect models
+# ────────────────────────────────────────────────
+models=$(ollama ls | tail -n +2 | sort | awk '{print $1}' | tr '\n' ' ')
+
+if [ -z "$models" ]; then
+    echo "No models found."
+    exit 0
+fi
+
+total=$(echo "$models" | wc -w)
+current=0
+
+for model in $models; do
+    current=$((current + 1))
+
+    echo "----------------------------------------"
+    echo "MODEL $current/$total : $model"
+    echo "----------------------------------------"
+
+    safe_name=$(echo "$model" | tr '/:' '_-')
+    full_log="${OUTPUT_DIR}/${safe_name}.log"
+
+    {
+        echo "## MODEL: $model"
+        echo "started: $(date '+%Y-%m-%d %H:%M:%S')"
+        echo "runs: $N"
+        echo "----------------------------------------"
+    } >> "$SUMMARY_FILE"
+
+    if [ -f "$full_log" ]; then
+        echo -e "Skipping $model, already ran! ($full_log)"
+        continue
+    fi
+
+    : > "$full_log"
+
+    i=1
+    while [ $i -le "$N" ]; do
+        echo "  run $i/$N ..."
+
+        echo -e "\n\n=== RUN $i ===\n" >> "$full_log"
+        cat "$PROMPT_FILE" | ollama run "$model" --verbose >> "$full_log" 2>&1
+
+        {
+            echo "### RUN $i"
+            # Get stat lines at the end of the file
+            tail -n 9 "$full_log"
+            echo "--------------------------------------------"
+        } >> "$SUMMARY_FILE"
+
+        echo "  run $i/$N done"
+        i=$((i + 1))
+    done
+
+    echo "" >> "$SUMMARY_FILE"
+    echo "finished model $model ($current/$total)"
+    echo ""
+done
+
+echo "----------------------------------------"
+echo "BENCHMARK COMPLETE"
+echo "full logs     : ${OUTPUT_DIR}/*.log"
+echo "summary stats : $SUMMARY_FILE"
+echo "finished at   : $(date '+%Y-%m-%d %H:%M:%S')"

@@ -1,0 +1,11 @@
+{
+  "VsCodeTaskButtons.tasks": [
+    {
+      "label": "OpenCode Web UI",
+      "task": "start-webui",
+      "alignment": "right",
+      "color": "warning"
+    }
+  ],
+  "peacock.remoteColor": "#330000"
+}
